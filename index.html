@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Controle Motorista V8 - Fechamento do Dia</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ffcc00">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0a0a0a;color:#fff;font-family:Arial;padding:10px;padding-bottom:100px}
+.header{background:#ffcc00;color:#000;padding:16px;border-radius:18px;text-align:center;font-weight:900}
+.header h1{margin:0;font-size:18px}.header p{margin:4px 0 0;font-size:12px;font-weight:700;opacity:.8}
+.cards{display:flex;gap:8px;margin:12px 0}
+.card{flex:1;background:#1a1a1a;border-radius:14px;padding:12px;text-align:center;font-weight:900;border:1px solid #222}
+.card small{display:block;font-size:11px;color:#aaa}
+.entradas{color:#00ff66}.saidas{color:#ff4444}.saldo{color:#ffcc00}
+.resumo-app{background:#1a1a1a;border-radius:14px;padding:12px;margin-bottom:12px;border:1px solid #222;font-size:12px;line-height:20px}
+.resumo-app b{color:#ffcc00}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.btn-mini{padding:12px;border-radius:12px;border:0;font-weight:900;font-size:12px;cursor:pointer}
+.btn-dark{background:#1a1a1a;color:#fff;border:1px solid #333}.btn-yellow{background:#ffcc00;color:#000}.btn-green{background:#00c853;color:#fff}
+.form{background:#1a1a1a;border-radius:18px;padding:12px;border:1px solid #222}
+select,input{width:100%;padding:14px;border-radius:12px;border:1px solid #333;background:#000;color:#fff;margin-top:8px;font-size:14px}
+.row{display:flex;gap:8px}.row input,.row select{flex:1}
+.btn-main{width:100%;background:#ffcc00;color:#000;border:0;padding:16px;border-radius:14px;font-weight:900;margin-top:12px;font-size:15px;cursor:pointer}
+.item{background:#151515;border-left:4px solid #ffcc00;border-radius:12px;padding:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+.item.gasto{border-left-color:#ff4444}.item.ganho{border-left-color:#00ff66}
+.item small{color:#888;display:block;font-size:11px}
+.trash{background:#2a2a2a;border:0;padding:10px 14px;border-radius:10px;font-size:16px;cursor:pointer}
+#lista{margin-top:10px}
+.filtro{display:flex;gap:8px;margin:12px 0}.filtro select{margin:0}
+/* FECHAMENTO */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;padding:15px;overflow:auto}
+.modal-box{background:#1a1a1a;border:2px solid #ffcc00;border-radius:18px;padding:16px;max-width:480px;margin:20px auto}
+.modal-box h2{margin:0 0 10px;text-align:center;color:#ffcc00;font-size:18px}
+.linha-fech{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed #333;font-size:14px}
+.linha-fech b{color:#fff}.linha-fech span{font-weight:900}
+.total-fech{background:#ffcc00;color:#000;border-radius:12px;padding:14px;text-align:center;margin-top:12px}
+.total-fech small{display:block;font-size:11px}.total-fech b{font-size:26px}
+.btn-fechar{width:100%;background:#333;color:#fff;border:0;padding:14px;border-radius:12px;font-weight:900;margin-top:10px}
+#btnInstalar{position:fixed;bottom:20px;right:20px;left:20px;background:linear-gradient(135deg,#ffcc00,#ffaa00);color:#000;border:0;padding:18px;border-radius:50px;font-weight:900;font-size:16px;box-shadow:0 8px 25px rgba(255,204,0,.5);display:none;z-index:9999;animation:pulsa 1.5s infinite;cursor:pointer}
+@keyframes pulsa{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+<h1>🚗 CONTROLE MOTORISTA V8</h1>
+<p>Uber • 99 • inDrive • Fechamento do Dia</p>
+</div>
+
+<div class="cards">
+<div class="card"><small>Ganhos R$</small><b class="entradas" id="entradas">0.00</b></div>
+<div class="card"><small>Gastos R$</small><b class="saidas" id="saidas">0.00</b></div>
+<div class="card"><small>Lucro R$</small><b class="saldo" id="saldo">0.00</b></div>
+</div>
+
+<div class="resumo-app" id="resumoApp">
+<b>📊 HOJE:</b> <span id="resHoje">Carregando...</span><br>
+<b>🛣️ KM TOTAL:</b> <span id="kmTotal">0</span> km &nbsp;|&nbsp; <b>💰 R$ / KM:</b> <span id="porKm">0.00</span><br>
+<b>🚗 UBER:</b> R$ <span id="rUber">0.00</span> &nbsp;|&nbsp; <b>🟡 99:</b> R$ <span id="r99">0.00</span> &nbsp;|&nbsp; <b>🟢 inDrive:</b> R$ <span id="rIndrive">0.00</span>
+</div>
+
+<div class="actions">
+<button class="btn-mini btn-green" onclick="abrirFechamento()">📊 FECHAR O DIA</button>
+<button class="btn-mini btn-yellow" onclick="limparHoje()">🧹 ZERAR HOJE</button>
+<button class="btn-mini btn-dark" onclick="document.getElementById('fileBackup').click()">♻️ RESTAURAR</button>
+<button class="btn-mini btn-dark" onclick="exportar()">💾 EXPORTAR</button>
+<input type="file" id="fileBackup" hidden accept=".json" onchange="restaurar(this)">
+</div>
+
+<div class="form">
+<select id="tipo" onchange="trocarTipo()">
+<option value="ganho">📥 GANHO - Corrida / Gorjeta / Bônus</option>
+<option value="gasto">📤 GASTO - Combustível / Manutenção</option>
+</select>
+<select id="app">
+<option>🚗 Uber</option>
+<option>🟡 99</option>
+<option>🟢 inDrive</option>
+<option>👤 Particular</option>
+<option>🏠 Casa / Pessoal</option>
+</select>
+<select id="categoria">
+<option>💰 Corrida</option>
+<option>💸 Gorjeta</option>
+<option>🎁 Bônus / Promoção</option>
+<option>⛽ Gasolina</option>
+<option>🔥 GNV</option>
+<option>🛢️ Etanol</option>
+<option>🚗 Aluguel do Carro</option>
+<option>🔧 Manutenção / Troca de Óleo</option>
+<option>🧼 Lavagem</option>
+<option>🍔 Alimentação</option>
+<option>🅿️ Estacionamento / Pedágio</option>
+<option>📱 Internet / Plano</option>
+<option>💳 Outros</option>
+</select>
+<input id="desc" placeholder="Ex: Corrida Centro - Boqueirão">
+<div class="row">
+<input id="valor" type="number" step="0.01" placeholder="Valor R$">
+<input id="km" type="number" step="0.1" placeholder="KM rodado">
+</div>
+<div class="row">
+<input id="dataGasto" type="date">
+<input id="horaGasto" type="time">
+</div>
+<button class="btn-main" onclick="salvar()">💾 SALVAR LANÇAMENTO</button>
+</div>
+
+<div class="filtro">
+<select id="filtroApp" onchange="render()"><option value="todos">Todos os Apps</option><option>🚗 Uber</option><option>🟡 99</option><option>🟢 inDrive</option><option>👤 Particular</option></select>
+<select id="filtroTipo" onchange="render()"><option value="todos">Ganhos + Gastos</option><option value="ganho">Só Ganhos</option><option value="gasto">Só Gastos</option></select>
+</div>
+
+<div id="lista"></div>
+
+<!-- MODAL FECHAMENTO -->
+<div class="modal" id="modalFech">
+<div class="modal-box">
+<h2>📊 FECHAMENTO DO DIA</h2>
+<label style="font-size:12px;color:#aaa">Que dia você quer fechar?</label>
+<input id="dataFech" type="date">
+<div class="row">
+<div style="flex:1"><label style="font-size:12px;color:#aaa">Começou às</label><input id="horaInicio" type="time" value="08:00"></div>
+<div style="flex:1"><label style="font-size:12px;color:#aaa">Terminou às</label><input id="horaFim" type="time" value="20:00"></div>
+</div>
+<button class="btn-main" onclick="calcularFechamento()">🧮 CALCULAR FECHAMENTO</button>
+<div id="resultadoFech" style="display:none">
+<div class="linha-fech"><b>📅 Data</b><span id="fData">-</span></div>
+<div class="linha-fech"><b>⏰ Horas trabalhadas</b><span id="fHoras">-</span></div>
+<div class="linha-fech"><b>🚗 Corridas feitas</b><span id="fCorridas">-</span></div>
+<div class="linha-fech"><b>🛣️ KM rodado</b><span id="fKm">-</span></div>
+<div class="linha-fech"><b>💰 Ganhos totais</b><span style="color:#00ff66" id="fGanhos">-</span></div>
+<div class="linha-fech"><b>📤 Gastos totais</b><span style="color:#ff4444" id="fGastos">-</span></div>
+<div class="linha-fech"><b>💰 Média por corrida</b><span id="fMedia">-</span></div>
+<div class="linha-fech"><b>💰 Ganho por KM</b><span id="fPorKm">-</span></div>
+<div class="linha-fech"><b>💰 Ganho por HORA (bruto)</b><span id="fPorHoraBruto">-</span></div>
+<div class="total-fech"><small>LUCRO LÍQUIDO DO DIA • POR HORA LÍQUIDA</small><b id="fLucro">R$ 0,00</b><b style="font-size:16px;display:block;margin-top:4px" id="fPorHora">R$ 0,00 / hora</b><span id="fMsg" style="font-size:12px;font-weight:700;display:block;margin-top:6px"></span></div>
+<button class="btn-main" style="background:#00c853;color:#fff" onclick="compartilharFechamento()">📤 COMPARTILHAR FECHAMENTO</button>
+</div>
+<button class="btn-fechar" onclick="fecharModal()">✖️ FECHAR</button>
+</div>
+</div>
+
+<button id="btnInstalar" onclick="instalarApp()">📲 INSTALAR APLICATIVO</button>
+
+<script>
+let gastos=JSON.parse(localStorage.getItem('gastos_v7_motorista')||'[]');
+let ultimoFech=null;
+function initDH(){let a=new Date();document.getElementById('dataGasto').valueAsDate=a;document.getElementById('horaGasto').value=a.toTimeString().slice(0,5);document.getElementById('dataFech').valueAsDate=a;}initDH();
+function trocarTipo(){let t=document.getElementById('tipo').value;let c=document.getElementById('categoria');if(t==='ganho'){c.value='💰 Corrida';}else{c.value='⛽ Gasolina';}}
+function salvar(){
+let tipo=document.getElementById('tipo').value;
+let app=document.getElementById('app').value;
+let categoria=document.getElementById('categoria').value;
+let desc=document.getElementById('desc').value.trim()||categoria;
+let valor=parseFloat(document.getElementById('valor').value);
+let km=parseFloat(document.getElementById('km').value)||0;
+let data=document.getElementById('dataGasto').value;
+let hora=document.getElementById('horaGasto').value;
+if(!valor||isNaN(valor)){alert('Digite o valor!');return}
+gastos.unshift({id:Date.now(),tipo,app,categoria,desc,valor,km,data,hora});
+localStorage.setItem('gastos_v7_motorista',JSON.stringify(gastos));
+document.getElementById('desc').value='';document.getElementById('valor').value='';document.getElementById('km').value='';initDH();render();
+}
+function render(){
+let ent=0,sai=0,kmT=0,uber=0,v99=0,ind=0,html='';
+let fApp=document.getElementById('filtroApp').value;
+let fTipo=document.getElementById('filtroTipo').value;
+let hoje=new Date().toISOString().split('T')[0];
+let ganhoHoje=0,gastoHoje=0;
+gastos.forEach(g=>{
+if(g.tipo==='ganho'){ent+=g.valor;if(g.app.includes('Uber'))uber+=g.valor;if(g.app.includes('99'))v99+=g.valor;if(g.app.includes('inDrive'))ind+=g.valor;}else{sai+=g.valor;}
+kmT+=g.km||0;
+if(g.data===hoje){if(g.tipo==='ganho')ganhoHoje+=g.valor;else gastoHoje+=g.valor;}
+});
+let lucro=ent-sai;
+document.getElementById('entradas').innerText=ent.toFixed(2);
+document.getElementById('saidas').innerText=sai.toFixed(2);
+document.getElementById('saldo').innerText=lucro.toFixed(2);
+document.getElementById('kmTotal').innerText=kmT.toFixed(1);
+document.getElementById('porKm').innerText=kmT>0?(lucro/kmT).toFixed(2):'0.00';
+document.getElementById('rUber').innerText=uber.toFixed(2);
+document.getElementById('r99').innerText=v99.toFixed(2);
+document.getElementById('rIndrive').innerText=ind.toFixed(2);
+document.getElementById('resHoje').innerText=`Ganhou R$ ${ganhoHoje.toFixed(2)} - Gastou R$ ${gastoHoje.toFixed(2)} = Lucro R$ ${(ganhoHoje-gastoHoje).toFixed(2)}`;
+gastos.forEach(g=>{
+if(fApp!=='todos'&&g.app!==fApp)return;
+if(fTipo!=='todos'&&g.tipo!==fTipo)return;
+let dataBr=g.data?g.data.split('-').reverse().join('/'):'';
+let sinal=g.tipo==='ganho'?'+':'-';
+let cor=g.tipo==='ganho'?'#00ff66':'#ff4444';
+html+=`<div class="item ${g.tipo}"><div><b style="color:${cor}">${sinal} R$ ${g.valor.toFixed(2)} - ${g.desc}</b><small>${g.app} • ${g.categoria} ${g.km?`• ${g.km} km`:''} • 📅 ${dataBr} ⏰ ${g.hora||''}</small></div><button class="trash" onclick="del(${g.id})">🗑️</button></div>`;
+});
+document.getElementById('lista').innerHTML=html||'<p style="text-align:center;color:#555;margin-top:20px">Nenhum lançamento ainda. Bora rodar! 🚗</p>';
+}
+function del(id){if(confirm('Apagar?')){gastos=gastos.filter(g=>g.id!==id);localStorage.setItem('gastos_v7_motorista',JSON.stringify(gastos));render();}}
+function limparHoje(){if(confirm('Zerar só os lançamentos de HOJE?')){let hoje=new Date().toISOString().split('T')[0];gastos=gastos.filter(g=>g.data!==hoje);localStorage.setItem('gastos_v7_motorista',JSON.stringify(gastos));render();}}
+function exportar(){let blob=new Blob([JSON.stringify(gastos)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`backup-motorista-${new Date().toISOString().split('T')[0]}.json`;a.click();}
+function restaurar(input){let file=input.files[0];if(!file)return;let reader=new FileReader();reader.onload=e=>{try{let dados=JSON.parse(e.target.result);if(Array.isArray(dados)){gastos=dados;localStorage.setItem('gastos_v7_motorista',JSON.stringify(gastos));render();alert(`✅ ${dados.length} restaurados!`);}}catch(err){alert('Erro ao ler backup')}};reader.readAsText(file);}
+// FECHAMENTO
+function abrirFechamento(){document.getElementById('modalFech').style.display='block';document.getElementById('dataFech').valueAsDate=new Date();}
+function fecharModal(){document.getElementById('modalFech').style.display='none';}
+function calcularFechamento(){
+let data=document.getElementById('dataFech').value;
+let hi=document.getElementById('horaInicio').value;
+let hf=document.getElementById('horaFim').value;
+if(!data||!hi||!hf){alert('Preencha data e horas!');return;}
+let [h1,m1]=hi.split(':').map(Number);let [h2,m2]=hf.split(':').map(Number);
+let minutos=(h2*60+m2)-(h1*60+m1);if(minutos<=0)minutos+=24*60;
+let horas=minutos/60;
+let dia=gastos.filter(g=>g.data===data);
+let ganhos=dia.filter(g=>g.tipo==='ganho').reduce((s,g)=>s+g.valor,0);
+let gastosDia=dia.filter(g=>g.tipo==='gasto').reduce((s,g)=>s+g.valor,0);
+let corridas=dia.filter(g=>g.tipo==='ganho'&&g.categoria.includes('Corrida')).length;
+if(corridas===0)corridas=dia.filter(g=>g.tipo==='ganho').length;
+let km=dia.reduce((s,g)=>s+(g.km||0),0);
+let lucro=ganhos-gastosDia;
+let media=corridas>0?ganhos/corridas:0;
+let porKm=km>0?lucro/km:0;
+let porHoraBruto=horas>0?ganhos/horas:0;
+let porHora=horas>0?lucro/horas:0;
+document.getElementById('resultadoFech').style.display='block';
+document.getElementById('fData').innerText=data.split('-').reverse().join('/');
+document.getElementById('fHoras').innerText=horas.toFixed(1)+'h ('+hi+' às '+hf+')';
+document.getElementById('fCorridas').innerText=corridas;
+document.getElementById('fKm').innerText=km.toFixed(1)+' km';
+document.getElementById('fGanhos').innerText='R$ '+ganhos.toFixed(2);
+document.getElementById('fGastos').innerText='R$ '+gastosDia.toFixed(2);
+document.getElementById('fMedia').innerText='R$ '+media.toFixed(2);
+document.getElementById('fPorKm').innerText='R$ '+porKm.toFixed(2);
+document.getElementById('fPorHoraBruto').innerText='R$ '+porHoraBruto.toFixed(2);
+document.getElementById('fLucro').innerText='R$ '+lucro.toFixed(2);
+document.getElementById('fPorHora').innerText='R$ '+porHora.toFixed(2)+' / hora';
+let msg=porHora>=25?'🔥 DIA TOP! Acima de R$ 25/hora limpo!':porHora>=15?'✅ Dia bom, na média!':porHora>=8?'⚠️ Dia fraco, tenta rodar em horário de pico':'❌ Dia ruim, amanhã melhora!';
+document.getElementById('fMsg').innerText=msg;
+ultimoFech={data:data.split('-').reverse().join('/'),horas:horas.toFixed(1),corridas,km:km.toFixed(1),ganhos:ganhos.toFixed(2),gastos:gastosDia.toFixed(2),lucro:lucro.toFixed(2),porHora:porHora.toFixed(2),media:media.toFixed(2),porKm:porKm.toFixed(2),msg};
+}
+function compartilharFechamento(){
+if(!ultimoFech){alert('Calcula o fechamento primeiro!');return;}
+let t=`📊 FECHAMENTO DO DIA - ${ultimoFech.data}\n\n⏰ Trabalhei: ${ultimoFech.horas}h\n🚗 Corridas: ${ultimoFech.corridas}\n🛣️ KM: ${ultimoFech.km} km\n💰 Ganhos: R$ ${ultimoFech.ganhos}\n📤 Gastos: R$ ${ultimoFech.gastos}\n💰 Média por corrida: R$ ${ultimoFech.media}\n💰 Por KM: R$ ${ultimoFech.porKm}\n\n✅ LUCRO LÍQUIDO: R$ ${ultimoFech.lucro}\n⏰ POR HORA: R$ ${ultimoFech.porHora}/h\n${ultimoFech.msg}`;
+if(navigator.share){navigator.share({title:'Fechamento do Dia',text:t})}else{navigator.clipboard.writeText(t);alert('Copiado!');}
+}
+let promptInstalacao=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();promptInstalacao=e;document.getElementById('btnInstalar').style.display='block';});
+async function instalarApp(){if(!promptInstalacao){alert('📲 Android: 3 pontinhos > Instalar app\n\niPhone: Compartilhar > Adicionar à Tela de Início');return;}promptInstalacao.prompt();const e=await promptInstalacao.userChoice;if(e.outcome==='accepted'){document.getElementById('btnInstalar').style.display='none';}promptInstalacao=null;}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}
+render();
+</script>
+</body>
+</html>
